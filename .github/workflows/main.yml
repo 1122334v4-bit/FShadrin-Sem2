@@ -19,7 +19,13 @@ jobs:
       - name: Сборка приложения в контейнере
         run: |
           mkdir -p .pip-cache dist
-          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m compileall app && cp -r app dist/"
+          docker create --name job-build -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m compileall app && mkdir -p dist && cp -r app dist/"
+          docker cp . job-build:/work
+          docker start -a job-build
+          docker cp job-build:/work/dist ./dist-out
+          docker cp job-build:/work/.pip-cache/. ./.pip-cache
+          docker rm job-build
+          rm -rf dist && mv dist-out dist
       - uses: actions/upload-artifact@v4
         with:
           name: app-build
@@ -37,7 +43,13 @@ jobs:
       - name: Модульные тесты в контейнере
         run: |
           mkdir -p .pip-cache
-          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m pytest -v --junitxml=test-results.xml"
+          docker create --name job-test -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m pytest -v --junitxml=test-results.xml"
+          docker cp . job-test:/work
+          docker start -a job-test || RC=$?
+          docker cp job-test:/work/test-results.xml ./test-results.xml || true
+          docker cp job-test:/work/.pip-cache/. ./.pip-cache || true
+          docker rm job-test
+          exit ${RC:-0}
       - uses: actions/upload-artifact@v4
         with:
           name: test-report
@@ -55,7 +67,12 @@ jobs:
       - name: Сканирование Semgrep в контейнере
         run: |
           mkdir -p .pip-cache
-          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache semgrep && semgrep scan --config p/python --error --severity ERROR app/"
+          docker create --name job-sast -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache semgrep && semgrep scan --config p/python --error --severity ERROR app/"
+          docker cp . job-sast:/work
+          docker start -a job-sast || RC=$?
+          docker cp job-sast:/work/.pip-cache/. ./.pip-cache || true
+          docker rm job-sast
+          exit ${RC:-0}
 
   deploy:
     runs-on: ubuntu-latest
