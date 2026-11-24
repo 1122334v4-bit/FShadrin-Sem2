@@ -4,23 +4,22 @@ on:
   push:
   workflow_dispatch:
 
+env:
+  PY_IMAGE: python:3.12-slim
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: python:3.12-slim
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
           path: .pip-cache
           key: pip-${{ hashFiles('requirements.txt') }}
-      - name: Установка зависимостей
-        run: pip install --cache-dir .pip-cache -r requirements.txt
-      - name: Сборка приложения
+      - name: Сборка приложения в контейнере
         run: |
-          python -m compileall app
-          mkdir -p dist
-          cp -r app dist/
+          mkdir -p .pip-cache dist
+          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m compileall app && cp -r app dist/"
       - uses: actions/upload-artifact@v4
         with:
           name: app-build
@@ -29,17 +28,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: build
-    container: python:3.12-slim
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
           path: .pip-cache
           key: pip-${{ hashFiles('requirements.txt') }}
-      - name: Установка зависимостей
-        run: pip install --cache-dir .pip-cache -r requirements.txt
-      - name: Модульные тесты
-        run: python -m pytest -v --junitxml=test-results.xml
+      - name: Модульные тесты в контейнере
+        run: |
+          mkdir -p .pip-cache
+          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache -r requirements.txt && python -m pytest -v --junitxml=test-results.xml"
       - uses: actions/upload-artifact@v4
         with:
           name: test-report
@@ -48,17 +46,16 @@ jobs:
   sast:
     runs-on: ubuntu-latest
     needs: test
-    container: python:3.12-slim
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
           path: .pip-cache
           key: pip-semgrep-v1
-      - name: Установка Semgrep
-        run: pip install --cache-dir .pip-cache semgrep
-      - name: Сканирование Semgrep
-        run: semgrep scan --config p/python --error --severity ERROR app/
+      - name: Сканирование Semgrep в контейнере
+        run: |
+          mkdir -p .pip-cache
+          docker run --rm -v "$PWD":/work -w /work $PY_IMAGE sh -c "pip install --cache-dir .pip-cache semgrep && semgrep scan --config p/python --error --severity ERROR app/"
 
   deploy:
     runs-on: ubuntu-latest
