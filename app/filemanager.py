@@ -3,14 +3,13 @@ from pathlib import Path
 
 
 class FileManager:
-    """Простой файловый менеджер, работающий внутри одной базовой папки."""
 
     def __init__(self, base_dir):
         self.base = Path(base_dir).resolve()
         self.base.mkdir(parents=True, exist_ok=True)
 
     def _safe(self, rel_path):
-        """Не даёт выйти за пределы базовой папки (защита от ../)."""
+
         p = (self.base / rel_path).resolve()
         if self.base != p and self.base not in p.parents:
             raise PermissionError("Выход за пределы базовой папки запрещён")
