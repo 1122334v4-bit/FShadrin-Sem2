@@ -81,8 +81,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Сборка Docker-образа
         run: docker build -t filemanager:latest .
-      - name: Локальный запуск
-        run: docker run --rm filemanager:latest
+      - name: Локальный запуск с пробросом портов
+        run: |
+          docker rm -f filemanager-app || true
+          docker run -d --name filemanager-app -p 8080:8000 filemanager:latest
+          sleep 3
+          docker ps --filter name=filemanager-app
+          docker exec filemanager-app python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000').read().decode())"
       - name: Сохранение образа как артефакта
         run: docker save filemanager:latest -o filemanager.tar
       - uses: actions/upload-artifact@v4

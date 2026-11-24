@@ -12,4 +12,5 @@ COPY --from=builder /install /usr/local
 COPY app/ ./app/
 
 USER appuser
-CMD ["python", "-c", "from app.filemanager import FileManager; fm = FileManager('/home/appuser/data'); fm.write_file('hello.txt', 'Файловый менеджер работает'); print(fm.list_dir()); print(fm.read_file('hello.txt'))"]
+EXPOSE 8000
+CMD ["python", "-m", "app.server"]
